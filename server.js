@@ -24,6 +24,20 @@ async function saveOne(f) {
   );
 }
 
+async function cleanupDeparted() {
+  const flights = await load();
+  const today = getLocalNow().toISOString().slice(0, 10);
+  const cleaned = flights.filter(f => {
+    if (f.status === 'departed' && f.scheduledDeparture) return f.scheduledDeparture.slice(0, 10) >= today;
+    return true;
+  });
+  if (cleaned.length !== flights.length) {
+    for (const f of flights) {
+      if (!cleaned.includes(f)) await pool.query('DELETE FROM flights WHERE id = $1', [f.id]);
+    }
+  }
+}
+
 function getLocalNow() {
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
@@ -62,31 +76,44 @@ function getStatusText(f) {
   return 'По расписанию';
 }
 
+function getFlightDay(f) {
+  const dep = f.expectedDeparture 
+    ? new Date(f.expectedDeparture) 
+    : f.scheduledDeparture 
+      ? new Date(f.scheduledDeparture) 
+      : null;
+  if (!dep || isNaN(dep.getTime())) return 'today';
+  const now = getLocalNow();
+  const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+  const tomorrowStart = new Date(todayStart.getTime() + 86400000);
+  if (dep >= tomorrowStart) return 'tomorrow';
+  return 'today';
+}
+
 app.get('/api/flights', async (req, res) => {
   let flights = await load();
   const showDep = req.query.showDeparted === 'true';
-  const today = getLocalNow().toISOString().slice(0, 10);
-  const cleaned = flights.filter(f => {
-    if (f.status === 'departed' && f.scheduledDeparture) return f.scheduledDeparture.slice(0, 10) >= today;
-    return true;
-  });
-  if (cleaned.length !== flights.length) {
-    for (const f of flights) {
-      if (!cleaned.includes(f)) await pool.query('DELETE FROM flights WHERE id = $1', [f.id]);
-    }
-    flights = cleaned;
-  }
+  
   if (!showDep) flights = flights.filter(f => f.status !== 'departed');
-  flights = flights.map(f => ({ ...f, computedStatus: computeStatus(f), statusText: getStatusText(f) }));
+  
+  flights = flights.map(f => ({ 
+    ...f, 
+    computedStatus: computeStatus(f), 
+    statusText: getStatusText(f),
+    flightDay: getFlightDay(f)
+  }));
+  
   flights.sort((a, b) => {
     const ta = a.expectedDeparture || a.scheduledDeparture || '';
     const tb = b.expectedDeparture || b.scheduledDeparture || '';
     return ta.localeCompare(tb);
   });
+  
   res.json(flights);
 });
 
 app.post('/api/flights', async (req, res) => {
+  await cleanupDeparted();
   const f = {
     id: Date.now().toString(),
     flightNumber: req.body.flightNumber || '',
@@ -108,6 +135,7 @@ app.post('/api/flights', async (req, res) => {
 });
 
 app.put('/api/flights/:id', async (req, res) => {
+  await cleanupDeparted();
   const flights = await load();
   const i = flights.findIndex(f => f.id === req.params.id);
   if (i === -1) return res.status(404).json({ error: 'Не найден' });
