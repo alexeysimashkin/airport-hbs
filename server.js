@@ -24,20 +24,6 @@ async function saveOne(f) {
   );
 }
 
-async function cleanupDeparted() {
-  const flights = await load();
-  const today = getLocalNow().toISOString().slice(0, 10);
-  const cleaned = flights.filter(f => {
-    if (f.status === 'departed' && f.scheduledDeparture) return f.scheduledDeparture.slice(0, 10) >= today;
-    return true;
-  });
-  if (cleaned.length !== flights.length) {
-    for (const f of flights) {
-      if (!cleaned.includes(f)) await pool.query('DELETE FROM flights WHERE id = $1', [f.id]);
-    }
-  }
-}
-
 function getLocalNow() {
   const now = new Date();
   const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
@@ -93,6 +79,19 @@ function getFlightDay(f) {
 app.get('/api/flights', async (req, res) => {
   let flights = await load();
   const showDep = req.query.showDeparted === 'true';
+  const today = getLocalNow().toISOString().slice(0, 10);
+  
+  // Очистка вчерашних departed при каждом запросе
+  const cleaned = flights.filter(f => {
+    if (f.status === 'departed' && f.scheduledDeparture) return f.scheduledDeparture.slice(0, 10) >= today;
+    return true;
+  });
+  if (cleaned.length !== flights.length) {
+    for (const f of flights) {
+      if (!cleaned.includes(f)) await pool.query('DELETE FROM flights WHERE id = $1', [f.id]);
+    }
+    flights = cleaned;
+  }
   
   if (!showDep) flights = flights.filter(f => f.status !== 'departed');
   
@@ -113,7 +112,6 @@ app.get('/api/flights', async (req, res) => {
 });
 
 app.post('/api/flights', async (req, res) => {
-  await cleanupDeparted();
   const f = {
     id: Date.now().toString(),
     flightNumber: req.body.flightNumber || '',
@@ -135,7 +133,6 @@ app.post('/api/flights', async (req, res) => {
 });
 
 app.put('/api/flights/:id', async (req, res) => {
-  await cleanupDeparted();
   const flights = await load();
   const i = flights.findIndex(f => f.id === req.params.id);
   if (i === -1) return res.status(404).json({ error: 'Не найден' });
