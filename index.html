@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Онлайн-табло аэропорта Шабровский</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body class="bg-gray">
+    <!-- PRELOADER -->
+    <div id="preloader" class="preloader">
+        <div class="preloader__logo">HBS</div>
+        <div class="preloader__spinner"></div>
+        <div class="preloader__text">Загрузка табло...</div>
+    </div>
+
+    <!-- APP -->
+    <div id="app">
+        <!-- HEADER -->
+        <header class="header bg-blue">
+            <div class="container">
+                <div class="header-inner">
+                    <div class="header-row">
+                        <a href="#" class="logo-site" onclick="returnToBoard();return false;">
+                            <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 160 32'%3E%3Ctext x='0' y='22' font-size='16' fill='%23fff' font-family='Arial' font-weight='bold'%3E✈ Онлайн-табло%3C/text%3E%3C/svg%3E" alt="Онлайн-табло" class="logo-site__img">
+                        </a>
+                        <div class="header-controls">
+                            <span class="admin-badge" id="adminBadge">АДМИН</span>
+                            <button class="login-btn" id="loginBtn">🔐 Вход</button>
+                            <button class="logout-btn" id="logoutBtn" style="display:none;">🚪 Выйти</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- MAIN CONTENT -->
+        <div id="mainContent">
+            <!-- будет заменяться JS -->
+        </div>
+
+        <!-- COOKIES -->
+        <div class="cookies-message" id="cookiesMessage">
+            <span>Продолжая использовать сайт, вы соглашаетесь с <a href="#">условиями обработки cookie</a></span>
+            <button class="i-close" onclick="document.getElementById('cookiesMessage').style.display='none'">✕</button>
+        </div>
+    </div>
+
+    <!-- LOGIN MODAL -->
+    <div class="login-overlay" id="loginModal">
+        <div class="login-box">
+            <h2>🔐 Вход для администратора</h2>
+            <label>Логин</label>
+            <input type="text" id="loginUser" value="admin">
+            <label>Пароль</label>
+            <input type="password" id="loginPass" value="admin">
+            <button class="login-submit" id="loginSubmit">Войти</button>
+            <div class="error-msg" id="loginError"></div>
+        </div>
+    </div>
+
+    <!-- EMAIL POPUP -->
+    <div class="email-popup-overlay" id="emailPopup">
+        <div class="email-popup-box">
+            <button class="email-popup-close" onclick="closeEmailPopup()">✕</button>
+            <h3>Отправить рейс на email</h3>
+            <label>Введите e-mail</label>
+            <input type="email" id="emailInput" placeholder="example@mail.ru">
+            <button class="popup-btn" onclick="sendEmail()">Отправить</button>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>
