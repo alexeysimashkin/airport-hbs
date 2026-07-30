@@ -624,4 +624,470 @@ function renderAdminPanel() {
                             </div>
                             <div class="form-group">
                                 <label>Окончание регистрации</label>
-                                <input type="datetime-local" id="fRegisterEnd" value="${editData.registerEnd
+                                <input type="datetime-local" id="fRegisterEnd" value="${editData.registerEnd || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Стойки регистрации</label>
+                                <input type="text" id="fCheckIn" placeholder="34,35,36" value="${editData.checkIn || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Начало посадки</label>
+                                <input type="datetime-local" id="fBoardingStart" value="${editData.boardingStart || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Окончание посадки</label>
+                                <input type="datetime-local" id="fBoardingEnd" value="${editData.boardingEnd || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Выход на посадку (Gate)</label>
+                                <input type="text" id="fGate" placeholder="13" value="${editData.gate || ''}">
+                            </div>
+                            <div class="form-group">
+                                <label>Статус *</label>
+                                <select id="fStatus" required>
+                                    ${statusOptions}
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Терминал</label>
+                                <input type="text" id="fTerminal" placeholder="A" value="${editData.terminal || 'A'}">
+                            </div>
+                            <div class="form-group">
+                                <label>Тип ВС</label>
+                                <input type="text" id="fPlane" placeholder="A-320" value="${editData.plane || ''}">
+                            </div>
+                            <div class="form-group full-width">
+                                <label>Примечание</label>
+                                <input type="text" id="fNote" placeholder="Совмещен с SU-6404" value="${editData.note || ''}">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button type="submit" class="btn-primary" id="submitBtn">${editingId !== null ? '💾 Сохранить изменения' : '➕ Добавить рейс'}</button>
+                            <button type="button" class="btn-cancel" id="cancelEditBtn" style="${editingId !== null ? '' : 'display:none;'}" onclick="cancelEdit()">✖️ Отменить</button>
+                        </div>
+                    </form>
+                </div>
+            `;
+}
+
+// =================================================================
+// CRUD
+// =================================================================
+async function saveFlight(e) {
+    e.preventDefault();
+
+    const number = document.getElementById('fNumber').value.trim();
+    const airline = document.getElementById('fAirline').value.trim();
+    const destination = document.getElementById('fDestination').value.trim();
+    const airportCode = document.getElementById('fAirportCode').value.trim().toUpperCase();
+    const scheduledTime = document.getElementById('fScheduledTime').value;
+    const expectedTime = document.getElementById('fExpectedTime').value;
+    const registerStart = document.getElementById('fRegisterStart').value;
+    const registerEnd = document.getElementById('fRegisterEnd').value;
+    const checkIn = document.getElementById('fCheckIn').value.trim();
+    const boardingStart = document.getElementById('fBoardingStart').value;
+    const boardingEnd = document.getElementById('fBoardingEnd').value;
+    const gate = document.getElementById('fGate').value.trim();
+    const status = document.getElementById('fStatus').value;
+    const terminal = document.getElementById('fTerminal').value.trim() || 'A';
+    const plane = document.getElementById('fPlane').value.trim();
+    const note = document.getElementById('fNote').value.trim();
+
+    if (!number || !airline || !destination || !airportCode || !scheduledTime || !status) {
+        alert('Заполните все обязательные поля (*)');
+        return;
+    }
+
+    if (editingId !== null) {
+        const index = flights.findIndex(f => f.id === editingId);
+        if (index !== -1) {
+            flights[index] = {
+                ...flights[index],
+                number,
+                airline,
+                destination,
+                airportCode,
+                scheduledTime,
+                expectedTime: expectedTime || scheduledTime,
+                registerStart,
+                registerEnd,
+                checkIn,
+                boardingStart,
+                boardingEnd,
+                gate,
+                status,
+                terminal,
+                plane,
+                note,
+            };
+        }
+        editingId = null;
+    } else {
+        const newFlight = {
+            id: nextId++,
+            number,
+            airline,
+            destination,
+            airportCode,
+            scheduledTime,
+            expectedTime: expectedTime || scheduledTime,
+            registerStart,
+            registerEnd,
+            checkIn,
+            boardingStart,
+            boardingEnd,
+            gate,
+            status,
+            terminal,
+            plane,
+            note,
+            isRelated: false
+        };
+        flights.push(newFlight);
+    }
+
+    await saveFlights(flights);
+
+    document.getElementById('submitBtn').textContent = '➕ Добавить рейс';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.getElementById('editBadge').className = 'edit-badge';
+
+    renderBoard();
+}
+
+async function deleteFlight(id) {
+    if (!confirm('Удалить рейс?')) return;
+    flights = flights.filter(f => f.id !== id);
+    flights = flights.filter(f => f.relatedTo !== id);
+    await saveFlights(flights);
+    if (editingId === id) cancelEdit();
+    renderBoard();
+}
+
+function startEdit(id) {
+    const f = getFlight(id);
+    if (!f) return;
+    editingId = id;
+    renderBoard();
+
+    setTimeout(() => {
+        document.getElementById('fNumber').value = f.number;
+        document.getElementById('fAirline').value = f.airline;
+        document.getElementById('fDestination').value = f.destination;
+        document.getElementById('fAirportCode').value = f.airportCode;
+        document.getElementById('fScheduledTime').value = f.scheduledTime;
+        document.getElementById('fExpectedTime').value = f.expectedTime || '';
+        document.getElementById('fRegisterStart').value = f.registerStart || '';
+        document.getElementById('fRegisterEnd').value = f.registerEnd || '';
+        document.getElementById('fCheckIn').value = f.checkIn || '';
+        document.getElementById('fBoardingStart').value = f.boardingStart || '';
+        document.getElementById('fBoardingEnd').value = f.boardingEnd || '';
+        document.getElementById('fGate').value = f.gate || '';
+        document.getElementById('fStatus').value = f.status;
+        document.getElementById('fTerminal').value = f.terminal || 'A';
+        document.getElementById('fPlane').value = f.plane || '';
+        document.getElementById('fNote').value = f.note || '';
+
+        document.getElementById('submitBtn').textContent = '💾 Сохранить изменения';
+        document.getElementById('cancelEditBtn').style.display = 'inline-block';
+        document.getElementById('editBadge').className = 'edit-badge visible';
+    }, 50);
+}
+
+function cancelEdit() {
+    editingId = null;
+    document.getElementById('submitBtn').textContent = '➕ Добавить рейс';
+    document.getElementById('cancelEditBtn').style.display = 'none';
+    document.getElementById('editBadge').className = 'edit-badge';
+    renderBoard();
+}
+
+// =================================================================
+// DETAIL
+// =================================================================
+function renderDetail(flightId) {
+    const f = getFlight(flightId);
+    if (!f) {
+        currentView = 'board';
+        renderBoard();
+        return;
+    }
+
+    const statusClass = getStatusClass(f.status);
+    const depTime = formatTimeDisplay(f.scheduledTime);
+    const depDate = formatDateDisplay(f.scheduledTime);
+
+    let arriveTime = '--:--';
+    let arriveDate = '--.--';
+    const baseTime = f.expectedTime || f.scheduledTime;
+    if (baseTime) {
+        const d = new Date(baseTime);
+        d.setHours(d.getHours() + 4);
+        arriveTime = formatTimeDisplay(d.toISOString());
+        arriveDate = formatDateDisplay(d.toISOString());
+    }
+
+    const regStart = f.registerStart ? formatTimeDisplay(f.registerStart) : '--:--';
+    const regEnd = f.registerEnd ? formatTimeDisplay(f.registerEnd) : '--:--';
+    const boardStart = f.boardingStart ? formatTimeDisplay(f.boardingStart) : '--:--';
+    const boardEnd = f.boardingEnd ? formatTimeDisplay(f.boardingEnd) : '--:--';
+
+    const statusDot = statusClass === 'green' ? 'green' :
+        statusClass === 'red' ? 'red' :
+        statusClass === 'orange' ? 'orange' :
+        statusClass === 'gray' ? 'gray' : 'blue';
+
+    const cards = [
+        { icon: '👤', title: 'Пассажирам с ОВЗ' },
+        { icon: '🎫', title: 'Купить билеты' },
+        { icon: '🅿️', title: 'Парковка' },
+        { icon: '🚌', title: 'Как добраться' },
+        { icon: '📋', title: 'Табло рейсов' },
+        { icon: '🧳', title: 'Багаж' },
+        { icon: '💼', title: 'Бизнес-залы' },
+        { icon: '📜', title: 'Правила' },
+        { icon: '🗺️', title: 'Схема терминала' },
+        { icon: '🍽️', title: 'Еда и покупки' },
+        { icon: '📅', title: 'Сезонное расписание' }
+    ];
+
+    let cardsHtml = cards.map(c =>
+        `<a href="#" class="detail-card-item" onclick="return false;">
+            <span class="icon">${c.icon}</span>
+            <span class="title">${c.title}</span>
+        </a>`
+    ).join('');
+
+    const html = `
+                <div class="detail-wrapper">
+                    <div class="container">
+                        <div class="detail-breadcrumb">
+                            <a href="#" onclick="returnToBoard();return false;">
+                                <svg viewBox="0 0 18 14"><path d="M7 12L2 7l5-5m-5 5h14" stroke="currentColor" stroke-width="2" fill="none"/></svg>
+                                Табло
+                            </a>
+                        </div>
+
+                        <div class="detail-head">
+                            <span class="detail-flight-number">${f.number}</span>
+                            <div class="detail-airline-logo">
+                                <img src="data:image/svg+xml;charset=utf-8,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 120 34%22%3E%3Crect width=%22120%22 height=%2234%22 fill=%22%23f0f0f0%22 rx=%224%22/%3E%3Ctext x=%2260%22 y=%2222%22 text-anchor=%22middle%22 font-size=%2216%22 fill=%22%23333%22 font-family=%22Arial%22 font-weight=%22bold%22%3E${getAirlineLogo(f.airline)}%3C/text%3E%3C/svg%3E" alt="${f.airline}">
+                            </div>
+                        </div>
+
+                        <div class="detail-route">
+                            <div class="route-point">
+                                <div class="route-city">Екатеринбург</div>
+                                <div class="route-airport">Шабровский</div>
+                                <div class="route-time">${depTime}</div>
+                                <div class="route-date">${depDate}</div>
+                            </div>
+                            <div class="route-arrow">✈</div>
+                            <div class="route-point route-point--to">
+                                <div class="route-city">${f.destination}</div>
+                                <div class="route-airport">${f.airportCode}</div>
+                                <div class="route-time">${arriveTime}</div>
+                                <div class="route-date">${arriveDate}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-info">
+                            <div class="detail-info-item">
+                                <div class="label">Расположение</div>
+                                <div class="value">Терминал ${f.terminal}</div>
+                            </div>
+                            <div class="detail-info-item">
+                                <div class="label">Выход на посадку</div>
+                                <div class="value">${f.gate || '—'}</div>
+                            </div>
+                            <div class="detail-info-item">
+                                <div class="label">Стойки регистрации</div>
+                                <div class="value">${f.checkIn || '—'}</div>
+                            </div>
+                        </div>
+
+                        <div class="detail-times">
+                            <div class="time-item">
+                                <div class="label">Регистрация</div>
+                                <div class="value">${regStart}—${regEnd}</div>
+                            </div>
+                            <div class="time-item">
+                                <div class="label">Посадка</div>
+                                <div class="value">${boardStart}—${boardEnd}</div>
+                            </div>
+                            <div class="time-item">
+                                <div class="label">Статус</div>
+                                <div class="detail-status-row">
+                                    <span>${f.status}</span>
+                                    <span class="detail-status-dot ${statusDot}"></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        ${f.note ? `<div class="detail-note">📌 ${f.note}</div>` : ''}
+
+                        <div class="detail-actions">
+                            <button class="action-btn primary" onclick="alert('Онлайн регистрация (демо)')">Онлайн регистрация</button>
+                            <button class="action-btn" onclick="alert('PDF сохранён (демо)')">📄 Сохранить pdf</button>
+                            <button class="action-btn" onclick="showEmailPopup()">✉️ Отправить на почту</button>
+                        </div>
+
+                        <div class="detail-cards">
+                            ${cardsHtml}
+                        </div>
+                    </div>
+                </div>
+            `;
+
+    document.getElementById('mainContent').innerHTML = html;
+    document.getElementById('adminBadge').className = isAdmin ? 'admin-badge visible' : 'admin-badge';
+    document.getElementById('loginBtn').style.display = isAdmin ? 'none' : 'inline-block';
+    document.getElementById('logoutBtn').style.display = isAdmin ? 'inline-block' : 'none';
+
+    currentView = 'detail';
+    selectedFlightId = flightId;
+}
+
+function openDetail(flightId) {
+    renderDetail(flightId);
+}
+
+// =================================================================
+// EMAIL
+// =================================================================
+function showEmailPopup() {
+    document.getElementById('emailPopup').classList.add('active');
+    document.getElementById('emailInput').value = '';
+    document.getElementById('emailInput').focus();
+}
+
+function closeEmailPopup() {
+    document.getElementById('emailPopup').classList.remove('active');
+}
+
+function sendEmail() {
+    const email = document.getElementById('emailInput').value.trim();
+    if (!email || !email.includes('@')) {
+        alert('Введите корректный email');
+        return;
+    }
+    alert(`Рейс отправлен на ${email} (демо)`);
+    closeEmailPopup();
+}
+
+// =================================================================
+// AUTH
+// =================================================================
+function showLogin() {
+    document.getElementById('loginModal').classList.add('active');
+    document.getElementById('loginError').textContent = '';
+}
+
+function closeLogin() {
+    document.getElementById('loginModal').classList.remove('active');
+}
+
+function login() {
+    const user = document.getElementById('loginUser').value.trim();
+    const pass = document.getElementById('loginPass').value.trim();
+    if (user === 'admin' && pass === 'admin') {
+        isAdmin = true;
+        closeLogin();
+        renderCurrentView();
+    } else {
+        document.getElementById('loginError').textContent = '❌ Неверный логин или пароль';
+    }
+}
+
+function logout() {
+    isAdmin = false;
+    if (editingId !== null) cancelEdit();
+    renderCurrentView();
+}
+
+function renderCurrentView() {
+    if (currentView === 'detail' && selectedFlightId !== null) {
+        renderDetail(selectedFlightId);
+    } else {
+        renderBoard();
+    }
+}
+
+function switchTab(tab) {
+    document.querySelectorAll('.btn-group .btn').forEach(b => b.classList.remove('is-active'));
+    document.querySelector(`.btn-group .btn[onclick*="${tab}"]`)?.classList.add('is-active');
+    renderBoard();
+}
+
+function checkDateChange() {
+    const today = getTodayStr();
+    if (today !== currentDate) {
+        currentDate = today;
+        renderCurrentView();
+    }
+}
+setInterval(checkDateChange, 60000);
+
+// =================================================================
+// INIT
+// =================================================================
+document.addEventListener('DOMContentLoaded', async function() {
+    await initFlights();
+
+    setTimeout(() => {
+        document.body.classList.add('is-ready');
+    }, 2500);
+
+    startStatusAutoUpdate();
+
+    document.getElementById('loginBtn').addEventListener('click', showLogin);
+    document.getElementById('logoutBtn').addEventListener('click', logout);
+    document.getElementById('loginSubmit').addEventListener('click', login);
+    document.getElementById('loginPass').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    document.getElementById('loginUser').addEventListener('keydown', (e) => { if (e.key === 'Enter') login(); });
+    document.getElementById('loginModal').addEventListener('click', function(e) {
+        if (e.target === this) closeLogin();
+    });
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') { closeLogin();
+            closeEmailPopup(); }
+    });
+
+    renderBoard();
+});
+
+// Глобальные
+window.openDetail = openDetail;
+window.renderBoard = renderBoard;
+window.renderDetail = renderDetail;
+window.startEdit = startEdit;
+window.deleteFlight = deleteFlight;
+window.cancelEdit = cancelEdit;
+window.saveFlight = saveFlight;
+window.showLogin = showLogin;
+window.closeLogin = closeLogin;
+window.login = login;
+window.logout = logout;
+window.switchTab = switchTab;
+window.showEmailPopup = showEmailPopup;
+window.closeEmailPopup = closeEmailPopup;
+window.sendEmail = sendEmail;
+window.returnToBoard = returnToBoard;
+window.renderCurrentView = renderCurrentView;
+window.updateFlightStatuses = updateFlightStatuses;
+window.startStatusAutoUpdate = startStatusAutoUpdate;
+window.currentView = 'board';
+window.selectedFlightId = null;
+window.currentDate = currentDate;
+window.showDeparted = showDeparted;
+window.searchQuery = searchQuery;
+window.isAdmin = isAdmin;
+window.editingId = editingId;
+window.flights = flights;
+window.getFlight = getFlight;
+window.getTodayStr = getTodayStr;
+window.isDeparted = isDeparted;
+window.saveFlights = saveFlights;
+window.STATUSES = STATUSES;
+window.DEPARTED_STATUSES = DEPARTED_STATUSES;
+window.initFlights = initFlights;
